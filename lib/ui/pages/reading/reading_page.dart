@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../data/models/app_config.dart';
 import '../../../data/models/book.dart';
 import '../../../data/models/book_chapter.dart';
+import '../../../data/models/conversation.dart' as conv;
 
 import '../../../data/repositories/book_repository.dart';
 import '../../../data/repositories/conversation_repository.dart';
+import '../../../data/repositories/session_repository.dart';
 import '../../../providers/chat_provider.dart';
 import '../../../providers/session_provider.dart';
 import '../../../providers/settings_provider.dart';
@@ -40,7 +43,7 @@ class _ReadingPageState extends ConsumerState<ReadingPage> {
   String _chapterContent = '';
   String _selectedText = '';
   String? _currentConversationId;
-  final ScrollController _contentScrollController = ScrollController();
+  bool _chatPrimary = true;
   final TextEditingController _chatInputController = TextEditingController();
 
   @override
@@ -64,6 +67,7 @@ class _ReadingPageState extends ConsumerState<ReadingPage> {
   Future<void> _loadChapter(BookChapter chapter) async {
     try {
       final content = await _ebookService.readChapterText(chapter.textFilePath);
+      final isChapterSwitch = _currentChapter != null && _currentChapter!.id != chapter.id;
       setState(() {
         _currentChapter = chapter;
         _chapterContent = content;
@@ -75,6 +79,10 @@ class _ReadingPageState extends ConsumerState<ReadingPage> {
       }
       // 自动创建或切换对话上下文
       _ensureConversation(chapter.id);
+      // 切换章节时注入系统消息，让 AI 感知上下文变化
+      if (isChapterSwitch && _currentConversationId != null) {
+        _injectChapterSwitchMessage(chapter);
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -85,21 +93,32 @@ class _ReadingPageState extends ConsumerState<ReadingPage> {
   }
 
   void _ensureConversation(String? chapterId) {
+    // 书籍级对话：整本书共用一个对话，切换章节不丢失上下文
     final conversations = _conversationRepo.getConversations(widget.bookId);
-    final existing = conversations.where((c) => c.chapterId == chapterId).toList();
-    if (existing.isNotEmpty) {
-      setState(() => _currentConversationId = existing.first.id);
+    if (conversations.isNotEmpty) {
+      setState(() => _currentConversationId = conversations.first.id);
     } else {
       final conv = _conversationRepo.createConversation(
         bookId: widget.bookId,
-        chapterId: chapterId,
-        title: _currentChapter?.title ?? '',
+        chapterId: null,
+        title: _book?.name ?? '阅读对话',
       );
       setState(() => _currentConversationId = conv.id);
     }
     if (_currentConversationId != null) {
       ref.read(messageListProvider(_currentConversationId!).notifier).loadMessages();
     }
+  }
+
+  /// 注入章节切换系统消息，让 AI 感知上下文变化
+  void _injectChapterSwitchMessage(BookChapter chapter) {
+    if (_currentConversationId == null) return;
+    _conversationRepo.addSystemMessage(
+      _currentConversationId!,
+      '[系统] 用户已切换到第${chapter.index + 1}章：${chapter.title}',
+    );
+    // 刷新消息列表以显示系统消息
+    ref.read(messageListProvider(_currentConversationId!).notifier).loadMessages();
   }
 
   void _onTextSelected(String text) {
@@ -124,7 +143,6 @@ class _ReadingPageState extends ConsumerState<ReadingPage> {
 
   @override
   void dispose() {
-    _contentScrollController.dispose();
     _chatInputController.dispose();
     super.dispose();
   }
@@ -141,6 +159,12 @@ class _ReadingPageState extends ConsumerState<ReadingPage> {
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
+          // 布局切换
+          IconButton(
+            icon: Icon(_chatPrimary ? Icons.view_sidebar : Icons.view_quilt),
+            tooltip: _chatPrimary ? '切换为阅读为主' : '切换为对话为主',
+            onPressed: () => setState(() => _chatPrimary = !_chatPrimary),
+          ),
           // 精读流程入口
           IconButton(
             icon: const Icon(Icons.route),
@@ -161,35 +185,52 @@ class _ReadingPageState extends ConsumerState<ReadingPage> {
           ),
         ],
       ),
-      body: SplitLayout(
-        ratio: 0.6,
-        leftPanel: Scaffold(
-          resizeToAvoidBottomInset: false,
-          appBar: AppBar(
-            title: Text(
-              _currentChapter?.title ?? '选择章节',
-              style: const TextStyle(fontSize: 14),
+      body: _chatPrimary
+          ? SplitLayout(
+              ratio: 0.65,
+              leftPanel: _buildChatPanel(),
+              rightPanel: _buildReadingPanel(readingPrefs),
+            )
+          : SplitLayout(
+              ratio: 0.6,
+              leftPanel: _buildReadingPanel(readingPrefs),
+              rightPanel: _buildChatPanel(),
             ),
-            automaticallyImplyLeading: false,
-            leading: Builder(
-              builder: (ctx) => IconButton(
-                icon: const Icon(Icons.list),
-                onPressed: () => Scaffold.of(ctx).openDrawer(),
-              ),
-            ),
-          ),
-          drawer: ChapterDrawer(
-            chapters: _chapters,
-            currentChapterId: _currentChapter?.id,
-            onChapterTap: _loadChapter,
-          ),
-          body: BookContentView(
-            content: _chapterContent,
-            prefs: readingPrefs,
-            title: _currentChapter?.title ?? '',
+    );
+  }
+
+  Widget _buildReadingPanel(ReadingPreferences readingPrefs) {
+    return Scaffold(
+      resizeToAvoidBottomInset: false,
+      appBar: AppBar(
+        title: Text(
+          _currentChapter?.title ?? '选择章节',
+          style: const TextStyle(fontSize: 14),
+        ),
+        automaticallyImplyLeading: false,
+        leading: Builder(
+          builder: (ctx) => IconButton(
+            icon: const Icon(Icons.list),
+            onPressed: () => Scaffold.of(ctx).openDrawer(),
           ),
         ),
-        rightPanel: _buildChatPanel(),
+      ),
+      drawer: ChapterDrawer(
+        chapters: _chapters,
+        currentChapterId: _currentChapter?.id,
+        onChapterTap: _loadChapter,
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: BookContentView(
+              content: _chapterContent,
+              prefs: readingPrefs,
+              title: _currentChapter?.title ?? '',
+            ),
+          ),
+          _buildChapterNavBar(),
+        ],
       ),
     );
   }
@@ -229,8 +270,8 @@ class _ReadingPageState extends ConsumerState<ReadingPage> {
               if (_currentConversationId != null) {
                 final newConv = _conversationRepo.createConversation(
                   bookId: widget.bookId,
-                  chapterId: _currentChapter?.id,
-                  title: _currentChapter?.title ?? '',
+                  chapterId: null,
+                  title: _book?.name ?? '阅读对话',
                 );
                 setState(() => _currentConversationId = newConv.id);
               }
@@ -312,6 +353,60 @@ class _ReadingPageState extends ConsumerState<ReadingPage> {
     );
   }
 
+  Widget _buildChapterNavBar() {
+    final currentIndex = _currentChapter?.index ?? 0;
+    final hasPrev = currentIndex > 0;
+    final hasNext = currentIndex < _chapters.length - 1;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: AppTheme.dividerColor)),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left, size: 20),
+            tooltip: '上一章',
+            onPressed: hasPrev
+                ? () => _loadChapter(_chapters[currentIndex - 1])
+                : null,
+          ),
+          Expanded(
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<int>(
+                value: currentIndex,
+                isExpanded: true,
+                style: const TextStyle(fontSize: 12, color: AppTheme.textPrimary),
+                items: _chapters.asMap().entries.map((e) {
+                  return DropdownMenuItem<int>(
+                    value: e.key,
+                    child: Text(
+                      e.value.title,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+                }).toList(),
+                onChanged: (index) {
+                  if (index != null && index != currentIndex) {
+                    _loadChapter(_chapters[index]);
+                  }
+                },
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right, size: 20),
+            tooltip: '下一章',
+            onPressed: hasNext
+                ? () => _loadChapter(_chapters[currentIndex + 1])
+                : null,
+          ),
+        ],
+      ),
+    );
+  }
+
   void _sendChatMessage(String text) {
     if (_currentConversationId == null) return;
 
@@ -327,9 +422,41 @@ class _ReadingPageState extends ConsumerState<ReadingPage> {
 
     final systemPrompt = PromptService.instance.getCurrentPromptContent() ?? '';
     final bookInfo = '《${_book?.name ?? ""}》 ${_book?.author ?? ""}';
+
+    // 阅读进度
+    final chapterIndex = (_currentChapter?.index ?? -1) + 1;
+    final totalChapters = _chapters.length;
+    final progressPercent = _book != null ? (_book!.progress * 100).toStringAsFixed(0) : '0';
+    final currentProgress = '第$chapterIndex章 / 共$totalChapters章，总进度 $progressPercent%';
+
+    // 阅读内容（章节文本）
     final readingContent = _chapterContent.isNotEmpty
         ? '章节：${_currentChapter?.title ?? ""}\n$_chapterContent'
         : '';
+
+    // 对话历史上下文
+    final recentMessages = _conversationRepo.getRecentMessages(_currentConversationId!);
+    final chatHistory = recentMessages.isNotEmpty
+        ? recentMessages
+            .where((m) => m.role != conv.MessageRole.system)
+            .map((m) => '${m.role == conv.MessageRole.user ? '用户' : 'AI'}: ${m.content}')
+            .join('\n')
+        : null;
+
+    // 费曼归档上下文
+    final sessionRepo = SessionRepository();
+    final sessions = sessionRepo.getSessions(widget.bookId);
+    final feynmanContext = sessions.isNotEmpty
+        ? sessions
+            .map((s) => [
+                  if ((s.contentSummary ?? '').isNotEmpty) '概述：${s.contentSummary}',
+                  if ((s.discussionConclusions ?? '').isNotEmpty) '结论：${s.discussionConclusions}',
+                  if ((s.feynmanOutput ?? '').isNotEmpty) '费曼输出：${s.feynmanOutput}',
+                  if ((s.blindSpots ?? '').isNotEmpty) '知识盲区：${s.blindSpots}',
+                ].join(' | '))
+            .where((s) => s.isNotEmpty)
+            .join('\n')
+        : null;
 
     try {
       ref.read(sendChatMessageProvider).call(
@@ -338,6 +465,9 @@ class _ReadingPageState extends ConsumerState<ReadingPage> {
         systemPrompt: systemPrompt,
         bookInfo: bookInfo,
         readingContent: readingContent,
+        chatHistory: chatHistory,
+        currentProgress: currentProgress,
+        feynmanContext: feynmanContext,
       );
     } catch (e) {
       if (mounted) {

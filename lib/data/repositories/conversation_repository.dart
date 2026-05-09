@@ -47,6 +47,19 @@ class ConversationRepository {
     return message;
   }
 
+  /// 添加系统消息
+  conv.ConversationMessage addSystemMessage(String conversationId, String content) {
+    final message = conv.ConversationMessage(
+      id: _uuid.v4(),
+      conversationId: conversationId,
+      role: conv.MessageRole.system,
+      content: content,
+      createdAt: DateTime.now(),
+    );
+    _db.insertMessage(message);
+    return message;
+  }
+
   /// 添加 AI 消息
   conv.ConversationMessage addAssistantMessage(String conversationId, String content) {
     final message = conv.ConversationMessage(

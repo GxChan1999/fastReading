@@ -85,12 +85,12 @@ class _BookCardState extends State<BookCard> {
               ),
             ),
             if (widget.onDelete != null)
-              AnimatedOpacity(
-                opacity: _isHovered ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 150),
-                child: Positioned(
-                  top: 4,
-                  right: 4,
+              Positioned(
+                top: 4,
+                right: 4,
+                child: AnimatedOpacity(
+                  opacity: _isHovered ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 150),
                   child: Material(
                     color: Colors.transparent,
                     child: IconButton(

@@ -10,6 +10,26 @@ class MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 系统消息渲染为居中轻量标签
+    if (message.role == conv.MessageRole.system) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              message.content,
+              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+            ),
+          ),
+        ),
+      );
+    }
+
     final isUser = message.role == conv.MessageRole.user;
     final isStreaming = message.isStreaming;
 

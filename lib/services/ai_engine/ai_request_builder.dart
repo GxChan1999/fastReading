@@ -5,6 +5,7 @@ class AIRequestBuilder {
   String? _currentProgress;
   String? _readingContent;
   String? _chatHistory;
+  String? _feynmanContext;
   String? _userInstruction;
 
   AIRequestBuilder();
@@ -39,6 +40,12 @@ class AIRequestBuilder {
     return this;
   }
 
+  /// 设置费曼归档上下文
+  AIRequestBuilder withFeynmanContext(String context) {
+    _feynmanContext = context;
+    return this;
+  }
+
   /// 设置用户指令
   AIRequestBuilder withUserInstruction(String instruction) {
     _userInstruction = instruction;
@@ -53,6 +60,7 @@ class AIRequestBuilder {
     prompt = prompt.replaceAll('{current_progress}', _currentProgress ?? '');
     prompt = prompt.replaceAll('{reading_content}', _readingContent ?? '');
     prompt = prompt.replaceAll('{chat_history}', _chatHistory ?? '');
+    prompt = prompt.replaceAll('{feynman_context}', _feynmanContext ?? '');
     return prompt;
   }
 
@@ -81,7 +89,12 @@ class AIRequestBuilder {
       messages.add({'role': 'system', 'content': '当前阅读内容：\n$_readingContent'});
     }
 
-    // 5. 用户指令
+    // 5. 费曼归档上下文
+    if (_feynmanContext != null && _feynmanContext!.isNotEmpty) {
+      messages.add({'role': 'system', 'content': '用户已有的费曼学习归档记录：\n$_feynmanContext'});
+    }
+
+    // 6. 用户指令
     if (_userInstruction != null && _userInstruction!.isNotEmpty) {
       messages.add({'role': 'user', 'content': _userInstruction!});
     }
@@ -105,6 +118,7 @@ class AIRequestBuilder {
     _currentProgress = null;
     _readingContent = null;
     _chatHistory = null;
+    _feynmanContext = null;
     _userInstruction = null;
   }
 }

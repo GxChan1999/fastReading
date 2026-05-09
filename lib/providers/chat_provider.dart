@@ -72,6 +72,8 @@ class SendChatMessage {
     String? bookInfo,
     String? readingContent,
     String? chatHistory,
+    String? currentProgress,
+    String? feynmanContext,
     void Function(String chunk)? onChunk,
   }) async {
     final engine = _ref.read(aiEngineProvider);
@@ -84,8 +86,10 @@ class SendChatMessage {
     final builder = AIRequestBuilder()
         .withSystemPrompt(systemPrompt)
         .withBookInfo(bookInfo ?? '')
+        .withCurrentProgress(currentProgress ?? '')
         .withReadingContent(readingContent ?? '')
         .withChatHistory(chatHistory ?? '')
+        .withFeynmanContext(feynmanContext ?? '')
         .withUserInstruction(userMessage);
 
     // 3. 创建空的 AI 消息占位
