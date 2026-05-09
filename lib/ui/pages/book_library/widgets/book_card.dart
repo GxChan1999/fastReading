@@ -70,7 +70,7 @@ class _BookCardState extends State<BookCard> {
                         borderRadius: BorderRadius.circular(2),
                         child: LinearProgressIndicator(
                           value: widget.book.progress,
-                          backgroundColor: Colors.grey[200],
+                          backgroundColor: AppTheme.dividerColor,
                           valueColor: AlwaysStoppedAnimation<Color>(
                             widget.book.status == ReadingStatus.finished
                                 ? AppTheme.successColor
@@ -137,7 +137,7 @@ class _BookCardState extends State<BookCard> {
       child: Icon(
         Icons.menu_book,
         size: 48,
-        color: Colors.black26,
+        color: AppTheme.textHint,
       ),
     );
     // Simplify: use same icon for all formats since it's just a placeholder

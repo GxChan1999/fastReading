@@ -131,11 +131,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.chat_bubble_outline, size: 48, color: Colors.grey[300]),
+                        Icon(Icons.chat_bubble_outline, size: 48, color: AppTheme.textHint),
                         const SizedBox(height: 12),
                         Text(
                           '开始与 AI 讨论阅读内容',
-                          style: TextStyle(color: Colors.grey[400]),
+                          style: TextStyle(color: AppTheme.textSecondary),
                         ),
                       ],
                     ),

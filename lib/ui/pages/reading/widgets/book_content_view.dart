@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../data/models/app_config.dart';
 
 /// 书籍内容渲染区 — PageView 翻页模式
@@ -28,6 +30,7 @@ class _BookContentViewState extends State<BookContentView> {
   double? _lastWidth;
   double? _lastHeight;
   PageController? _internalController;
+  bool _isHovering = false;
 
   PageController get _controller =>
       widget.pageController ?? (_internalController ??= PageController());
@@ -73,69 +76,87 @@ class _BookContentViewState extends State<BookContentView> {
       return;
     }
 
-    // 估算每页字符数：用行高和字体大小推算
-    final lineHeightEst = widget.prefs.fontSize * widget.prefs.lineHeight;
-    final linesPerPage = (pageHeight / lineHeightEst).floor();
-    // 中文字符宽度约等于字体大小
-    final charsPerLine = (pageWidth / widget.prefs.fontSize).floor();
-    var charsPerPage = (linesPerPage * charsPerLine).clamp(100, 10000);
-
-    final newPages = <String>[];
-    var offset = 0;
+    final lineHeight = widget.prefs.fontSize * widget.prefs.lineHeight;
+    final linesPerPage = (pageHeight / lineHeight).floor().clamp(5, 500);
 
     final painter = TextPainter(textDirection: TextDirection.ltr);
+    painter.text = TextSpan(text: text, style: textStyle);
+    painter.layout(maxWidth: pageWidth);
 
-    while (offset < text.length) {
-      // 取估计长度的文本，用 TextPainter 精确测量
-      var end = (offset + charsPerPage).clamp(0, text.length);
-      var candidate = text.substring(offset, end);
+    // 获取所有行的边界
+    final lineMetrics = painter.computeLineMetrics();
+    final newPages = <String>[];
 
-      painter.text = TextSpan(text: candidate, style: textStyle);
-      painter.layout(maxWidth: pageWidth);
+    for (var i = 0; i < lineMetrics.length; i += linesPerPage) {
+      final startLine = lineMetrics[i];
+      final endLineIdx = (i + linesPerPage - 1).clamp(0, lineMetrics.length - 1);
+      final endLine = lineMetrics[endLineIdx];
 
-      // 如果超出页面高度，减少字符
-      if (painter.height > pageHeight) {
-        var lo = offset;
-        var hi = end;
-        while (lo < hi - 1) {
-          final mid = (lo + hi) ~/ 2;
-          painter.text =
-              TextSpan(text: text.substring(offset, mid), style: textStyle);
-          painter.layout(maxWidth: pageWidth);
-          if (painter.height <= pageHeight) {
-            lo = mid;
-          } else {
-            hi = mid;
+      // 获取这段文本的字符范围
+      final startChar = _findCharOffsetForLine(
+          painter, text, i, startLine, searchForward: true);
+      var endChar = _findCharOffsetForLine(
+          painter, text, endLineIdx, endLine, searchForward: false);
+
+      // 回退到自然段落断点
+      if (endChar < text.length) {
+        final searchStart = (endChar - text.length ~/ 20).clamp(startChar, endChar);
+        final lastBreak = text.lastIndexOf('\n\n', endChar);
+        if (lastBreak > searchStart && lastBreak > startChar) {
+          endChar = lastBreak;
+        } else {
+          final lastSingle = text.lastIndexOf('\n', endChar);
+          if (lastSingle > searchStart && lastSingle > startChar + 10) {
+            endChar = lastSingle;
           }
-        }
-        end = lo;
-        // 回退到最近的自然断点（段落末尾）
-        final chunk = text.substring(offset, end);
-        final lastParaBreak = chunk.lastIndexOf('\n\n');
-        if (lastParaBreak > chunk.length ~/ 3) {
-          end = offset + lastParaBreak;
-        }
-      } else if (painter.height < pageHeight * 0.3 && end < text.length) {
-        // 内容太少，尝试多取一些
-        painter.text = TextSpan(
-            text: text.substring(offset, (offset + charsPerPage * 2).clamp(0, text.length)),
-            style: textStyle);
-        painter.layout(maxWidth: pageWidth);
-        if (painter.height <= pageHeight) {
-          charsPerPage = (charsPerPage * 1.5).round();
         }
       }
 
-      final pageText = text.substring(offset, end).trimRight();
+      endChar = endChar.clamp(startChar + 1, text.length);
+      final pageText = text.substring(startChar, endChar).trimRight();
       if (pageText.isNotEmpty) {
         newPages.add(pageText);
       }
-      offset = end;
     }
 
     _pages
       ..clear()
       ..addAll(newPages.isEmpty ? [text] : newPages);
+  }
+
+  /// 根据行号查找对应的字符偏移量
+  int _findCharOffsetForLine(
+    TextPainter painter,
+    String text,
+    int lineIndex,
+    LineMetrics lineMetric, {
+    required bool searchForward,
+  }) {
+    // 用 getPositionForOffset 定位
+    final y = lineMetric.baseline - lineMetric.height / 2;
+    final position =
+        painter.getPositionForOffset(Offset(lineMetric.left + 1, y));
+    return position.offset;
+  }
+
+  Widget _buildPageArrow({
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Center(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: AppTheme.cardColor.withOpacity(0.85),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: AppTheme.textPrimary, size: 22),
+        ),
+      ),
+    );
   }
 
   @override
@@ -145,11 +166,11 @@ class _BookContentViewState extends State<BookContentView> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.menu_book, size: 48, color: Colors.grey[300]),
+            Icon(Icons.menu_book, size: 48, color: AppTheme.textHint),
             const SizedBox(height: 16),
             Text(
               widget.title.isEmpty ? '选择章节开始阅读' : '内容加载中...',
-              style: TextStyle(fontSize: 16, color: Colors.grey[400]),
+              style: const TextStyle(fontSize: 16, color: AppTheme.textSecondary),
             ),
           ],
         ),
@@ -176,51 +197,104 @@ class _BookContentViewState extends State<BookContentView> {
           return const Center(child: CircularProgressIndicator());
         }
 
-        return Stack(
-          children: [
-            Container(
-              color: widget.prefs.backgroundColor,
-              child: PageView.builder(
-                controller: _controller,
-                itemCount: _pages.length,
-                onPageChanged: (page) {
-                  setState(() => _currentPage = page);
-                  widget.onPageChanged?.call(page);
-                },
-                itemBuilder: (context, index) {
-                  return Container(
-                    padding: EdgeInsets.all(w > 600 ? 32 : 16),
-                    child: SelectableText(
-                      _pages[index],
-                      style: TextStyle(
-                        fontSize: widget.prefs.fontSize,
-                        height: widget.prefs.lineHeight,
-                        color: widget.prefs.textColor,
-                        fontFamily: widget.prefs.useSystemFont ? null : 'serif',
+        return MouseRegion(
+          onEnter: (_) => setState(() => _isHovering = true),
+          onExit: (_) => setState(() => _isHovering = false),
+          child: Listener(
+            onPointerSignal: (event) {
+              if (event is PointerScrollEvent) {
+                final dy = event.scrollDelta.dy;
+                if (dy > 0 && _currentPage < _pages.length - 1) {
+                  _controller.nextPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                } else if (dy < 0 && _currentPage > 0) {
+                  _controller.previousPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                }
+              }
+            },
+            child: Stack(
+              children: [
+                Container(
+                  color: widget.prefs.backgroundColor,
+                  child: PageView.builder(
+                    controller: _controller,
+                    itemCount: _pages.length,
+                    onPageChanged: (page) {
+                      setState(() => _currentPage = page);
+                      widget.onPageChanged?.call(page);
+                    },
+                    itemBuilder: (context, index) {
+                      return Container(
+                        padding: EdgeInsets.all(w > 600 ? 32 : 16),
+                        child: SelectableText(
+                          _pages[index],
+                          style: TextStyle(
+                            fontSize: widget.prefs.fontSize,
+                            height: widget.prefs.lineHeight,
+                            color: widget.prefs.textColor,
+                            fontFamily:
+                                widget.prefs.useSystemFont ? null : 'serif',
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                // 鼠标悬停时的翻页箭头
+                if (_isHovering && _pages.length > 1) ...[
+                  if (_currentPage > 0)
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      child: _buildPageArrow(
+                        icon: Icons.chevron_left,
+                        onTap: () => _controller.previousPage(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                        ),
                       ),
                     ),
-                  );
-                },
-              ),
-            ),
-            // 页数指示器
-            Positioned(
-              bottom: 8,
-              right: 16,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(12),
+                  if (_currentPage < _pages.length - 1)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      child: _buildPageArrow(
+                        icon: Icons.chevron_right,
+                        onTap: () => _controller.nextPage(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                        ),
+                      ),
+                    ),
+                ],
+                // 页数指示器
+                Positioned(
+                  bottom: 8,
+                  right: 16,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.cardColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${_currentPage + 1} / ${_pages.length}',
+                      style:
+                          const TextStyle(fontSize: 12, color: Colors.white),
+                    ),
+                  ),
                 ),
-                child: Text(
-                  '${_currentPage + 1} / ${_pages.length}',
-                  style: const TextStyle(fontSize: 12, color: Colors.white),
-                ),
-              ),
+              ],
             ),
-          ],
+          ),
         );
       },
     );

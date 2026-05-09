@@ -89,5 +89,5 @@ class ReadingEfficiencyApp extends ConsumerWidget {
 }
 
 final themeModeProvider = StateProvider<ThemeMode>((ref) {
-  return ThemeMode.light;
+  return ThemeMode.dark;
 });

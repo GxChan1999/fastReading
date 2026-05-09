@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../data/models/conversation.dart' as conv;
 
-/// 消息气泡组件
+/// 消息气泡组件 — 支持 Markdown 渲染
 class MessageBubble extends StatelessWidget {
   final conv.ConversationMessage message;
 
@@ -18,12 +19,13 @@ class MessageBubble extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: Colors.grey[200],
+              color: AppTheme.elevatedColor,
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.goldBorder, width: 0.5),
             ),
             child: Text(
               message.content,
-              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+              style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
             ),
           ),
         ),
@@ -48,40 +50,20 @@ class MessageBubble extends StatelessWidget {
               ),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: isUser ? AppTheme.primaryColor : Colors.grey[100],
+                color: isUser ? AppTheme.primaryColor : AppTheme.cardColor,
                 borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
-                  bottomLeft: Radius.circular(isUser ? 16 : 4),
-                  bottomRight: Radius.circular(isUser ? 4 : 16),
+                  topLeft: const Radius.circular(12),
+                  topRight: const Radius.circular(12),
+                  bottomLeft: Radius.circular(isUser ? 12 : 2),
+                  bottomRight: Radius.circular(isUser ? 2 : 12),
                 ),
+                border: isUser
+                    ? null
+                    : Border.all(color: AppTheme.goldBorder, width: 0.5),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    message.content + (isStreaming ? '▋' : ''),
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: isUser ? Colors.white : AppTheme.textPrimary,
-                      height: 1.5,
-                    ),
-                  ),
-                  if (message.isStarred || message.isDifficulty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (message.isStarred)
-                            const Icon(Icons.star, size: 14, color: AppTheme.accentColor),
-                          if (message.isDifficulty)
-                            const Icon(Icons.help_outline, size: 14, color: AppTheme.warningColor),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
+              child: isUser
+                  ? _buildUserContent(isStreaming)
+                  : _buildAssistantContent(isStreaming),
             ),
           ),
           if (isUser) const SizedBox(width: 8),
@@ -91,15 +73,114 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
+  Widget _buildUserContent(bool isStreaming) {
+    return Text(
+      message.content + (isStreaming ? '▋' : ''),
+      style: TextStyle(
+        fontSize: 15,
+        color: AppTheme.backgroundColor,
+        height: 1.5,
+      ),
+    );
+  }
+
+  Widget _buildAssistantContent(bool isStreaming) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        MarkdownBody(
+          data: message.content + (isStreaming ? '▋' : ''),
+          selectable: true,
+          styleSheet: MarkdownStyleSheet(
+            p: const TextStyle(
+              fontSize: 15,
+              color: AppTheme.textPrimary,
+              height: 1.6,
+            ),
+            h1: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.primaryColor,
+              height: 1.4,
+            ),
+            h2: const TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.primaryLight,
+              height: 1.4,
+            ),
+            h3: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textPrimary,
+              height: 1.4,
+            ),
+            strong: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: AppTheme.primaryLight,
+            ),
+            code: TextStyle(
+              fontSize: 13,
+              fontFamily: 'monospace',
+              backgroundColor: AppTheme.backgroundColor,
+              color: AppTheme.primaryLight,
+            ),
+            codeblockDecoration: BoxDecoration(
+              color: AppTheme.backgroundColor,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: AppTheme.dividerColor),
+            ),
+            blockquoteDecoration: BoxDecoration(
+              border: const Border(
+                left: BorderSide(color: AppTheme.primaryColor, width: 2),
+              ),
+              color: AppTheme.backgroundColor.withOpacity(0.5),
+            ),
+            blockquotePadding: const EdgeInsets.only(left: 12, top: 4, bottom: 4),
+            listBullet: const TextStyle(color: AppTheme.primaryColor),
+            horizontalRuleDecoration: const BoxDecoration(
+              border: Border(
+                top: BorderSide(color: AppTheme.dividerColor, width: 0.5),
+              ),
+            ),
+            tableBorder: TableBorder.all(color: AppTheme.dividerColor, width: 0.5),
+            tableHead: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: AppTheme.primaryColor,
+            ),
+            tableBody: const TextStyle(color: AppTheme.textPrimary),
+          ),
+        ),
+        if (message.isStarred || message.isDifficulty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (message.isStarred)
+                  const Icon(Icons.star, size: 14,
+                      color: AppTheme.accentColor),
+                if (message.isDifficulty)
+                  const Icon(Icons.help_outline, size: 14,
+                      color: AppTheme.warningColor),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildAvatar(BuildContext context) {
     final isUser = message.role == conv.MessageRole.user;
     return CircleAvatar(
       radius: 14,
-      backgroundColor: isUser ? AppTheme.primaryColor : AppTheme.successColor,
+      backgroundColor:
+          isUser ? AppTheme.primaryColor : AppTheme.primaryDark,
       child: Icon(
         isUser ? Icons.person : Icons.auto_awesome,
         size: 16,
-        color: Colors.white,
+        color: AppTheme.backgroundColor,
       ),
     );
   }

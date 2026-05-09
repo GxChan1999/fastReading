@@ -126,6 +126,26 @@ class _ReadingPageState extends ConsumerState<ReadingPage> {
     _chatInputController.text = '关于这段内容：$text\n\n';
   }
 
+  void _openChapterDrawer() {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        transitionDuration: const Duration(milliseconds: 360),
+        reverseTransitionDuration: const Duration(milliseconds: 300),
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return ChapterDrawer(
+            chapters: _chapters,
+            currentChapterId: _currentChapter?.id,
+            onChapterTap: _loadChapter,
+          );
+        },
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+      ),
+    );
+  }
+
   void _openChatPage() {
     Navigator.pushNamed(
       context,
@@ -208,17 +228,10 @@ class _ReadingPageState extends ConsumerState<ReadingPage> {
           style: const TextStyle(fontSize: 14),
         ),
         automaticallyImplyLeading: false,
-        leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.list),
-            onPressed: () => Scaffold.of(ctx).openDrawer(),
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.list),
+          onPressed: _openChapterDrawer,
         ),
-      ),
-      drawer: ChapterDrawer(
-        chapters: _chapters,
-        currentChapterId: _currentChapter?.id,
-        onChapterTap: _loadChapter,
       ),
       body: Column(
         children: [
@@ -286,7 +299,7 @@ class _ReadingPageState extends ConsumerState<ReadingPage> {
                 ? Center(
                     child: Text(
                       '选择章节后开始对话',
-                      style: TextStyle(color: Colors.grey[400]),
+                      style: const TextStyle(color: AppTheme.textSecondary),
                     ),
                   )
                 : Consumer(
@@ -300,11 +313,11 @@ class _ReadingPageState extends ConsumerState<ReadingPage> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(Icons.chat_bubble_outline,
-                                  size: 48, color: Colors.grey[300]),
+                                  size: 48, color: AppTheme.textHint),
                               const SizedBox(height: 12),
                               Text(
                                 '选中文本或输入问题开始对话',
-                                style: TextStyle(color: Colors.grey[400]),
+                                style: const TextStyle(color: AppTheme.textSecondary),
                               ),
                             ],
                           ),
