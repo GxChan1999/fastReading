@@ -49,11 +49,14 @@ class _ReadingPageState extends ConsumerState<ReadingPage> {
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  // 缓存正文章节标题列表，供 AI 上下文章节号计算
-  List<String> get _contentChapterTitles => _chapters
+  // 缓存的正文（非前/后置）章节，供 AI 上下文章节号与进度计算
+  List<BookChapter> get _contentChapters => _chapters
       .where((c) => ChapterFilter.isContentChapter(c.title))
-      .map((c) => c.title)
       .toList();
+
+  int _getContentChapterIndex(BookChapter chapter) {
+    return _contentChapters.indexWhere((c) => c.id == chapter.id);
+  }
 
   @override
   void initState() {
@@ -82,8 +85,12 @@ class _ReadingPageState extends ConsumerState<ReadingPage> {
         _chapterContent = content;
       });
       if (_book != null) {
-        final progress = (chapter.index + 1) / _chapters.length;
-        _bookRepo.updateProgress(widget.bookId, chapter.index, progress);
+        final contentChapters = _contentChapters;
+        final contentIndex = _getContentChapterIndex(chapter);
+        if (contentChapters.isNotEmpty && contentIndex >= 0) {
+          final progress = (contentIndex + 1) / contentChapters.length;
+          _bookRepo.updateProgress(widget.bookId, contentIndex, progress);
+        }
       }
       _ensureConversation(chapter.id);
       if (isChapterSwitch && _currentConversationId != null) {
@@ -117,11 +124,14 @@ class _ReadingPageState extends ConsumerState<ReadingPage> {
 
   void _injectChapterSwitchMessage(BookChapter chapter) {
     if (_currentConversationId == null) return;
-    final realIndex = _contentChapterTitles.indexOf(chapter.title);
-    final displayNum = realIndex >= 0 ? realIndex + 1 : chapter.index + 1;
+    final contentIndex = _getContentChapterIndex(chapter);
+    final isContent = contentIndex >= 0;
+    final label = isContent
+        ? '正文第${contentIndex + 1}章（共${_contentChapters.length}章）'
+        : '辅文章节';
     _conversationRepo.addSystemMessage(
       _currentConversationId!,
-      '[系统] 用户已切换到正文第${displayNum}章：${chapter.title}',
+      '[系统] 用户已切换到$label：${chapter.title}',
     );
     ref.read(messageListProvider(_currentConversationId!).notifier).loadMessages();
   }
@@ -209,23 +219,26 @@ class _ReadingPageState extends ConsumerState<ReadingPage> {
     final bookInfo = '《${_book?.name ?? ""}》 ${_book?.author ?? ""}';
 
     // 计算真实章节号（仅正文）
-    final contentChapters = _contentChapterTitles;
-    final realIndex = _currentChapter != null
-        ? contentChapters.indexOf(_currentChapter!.title)
+    final contentChapters = _contentChapters;
+    final contentIndex = _currentChapter != null
+        ? _getContentChapterIndex(_currentChapter!)
         : -1;
-    final displayChapter = realIndex >= 0 ? realIndex + 1 : (_currentChapter?.index ?? -1) + 1;
-    final realTotalChapters = contentChapters.length;
-    final progressPercent =
-        _book != null ? (_book!.progress * 100).toStringAsFixed(0) : '0';
-    final currentProgress =
-        '第$displayChapter章 / 共$realTotalChapters章，总进度 $progressPercent%';
+    final totalContent = contentChapters.length;
+    final chapterTitle = _currentChapter?.title ?? '';
+
+    final chapterLabel = contentIndex >= 0
+        ? '正文第${contentIndex + 1}章 / 共${totalContent}章'
+        : '辅文章节（非正文）';
+    final progressPercent = contentIndex >= 0 && totalContent > 0
+        ? ((contentIndex + 1) / totalContent * 100).toStringAsFixed(0)
+        : '0';
+    final currentProgress = '$chapterLabel，进度 $progressPercent%';
 
     // 构建结构化章节内容（带元数据）
-    final chapterTitle = _currentChapter?.title ?? '';
     final readingContent = _chapterContent.isNotEmpty
         ? '## 正在阅读\n'
           '**章节**：$chapterTitle\n'
-          '**进度**：$currentProgress\n'
+          '**定位**：$currentProgress\n'
           '**书籍**：$bookInfo\n\n'
           '## 章节正文\n$_chapterContent'
         : '';
