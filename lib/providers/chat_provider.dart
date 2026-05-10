@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 import '../data/models/conversation.dart' as conv;
 import '../data/repositories/conversation_repository.dart';
 import '../services/ai_engine/ai_engine.dart';
@@ -97,18 +98,23 @@ class SendChatMessage {
 
     // 4. 发送流式请求
     var fullContent = '';
-    await engine.sendChat(
-      messages: builder.buildMessages(),
-      onChunk: (chunk) {
-        fullContent += chunk;
-        messageNotifier.updateMessage(assistantMsg.id, fullContent);
-      },
-      onComplete: (content) {
-        messageNotifier.updateMessage(assistantMsg.id, content);
-      },
-      onError: (error) {
-        messageNotifier.updateMessage(assistantMsg.id, '错误：$error');
-      },
-    );
+    try {
+      await engine.sendChat(
+        messages: builder.buildMessages(),
+        onChunk: (chunk) {
+          fullContent += chunk;
+          messageNotifier.updateMessage(assistantMsg.id, fullContent);
+        },
+        onComplete: (content) {
+          messageNotifier.updateMessage(assistantMsg.id, content);
+        },
+        onError: (error) {
+          messageNotifier.updateMessage(assistantMsg.id, '错误：$error');
+        },
+      );
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.cancel) return;
+      rethrow;
+    }
   }
 }

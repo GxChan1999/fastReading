@@ -1,6 +1,6 @@
 name: reading_efficiency_app
 description: 本地阅读提效对话APP
-version: 0.0.2+2
+version: 0.0.3+3
 
 environment:
   sdk: '>=3.4.4 <4.0.0'

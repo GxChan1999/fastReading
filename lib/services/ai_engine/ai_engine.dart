@@ -9,7 +9,7 @@ typedef OnStreamChunk = void Function(String chunk);
 typedef OnStreamComplete = void Function(String fullContent);
 typedef OnStreamError = void Function(String error);
 
-/// AI 引擎 — 直连大模型 API，支持流式响应、自动重试、请求节流
+/// AI 引擎 — 直连大模型 API，支持流式响应、自动重试、请求节流、新请求自动取消旧请求
 class AIEngine {
   static final AIEngine _instance = AIEngine._();
   factory AIEngine() => _instance;
@@ -22,6 +22,9 @@ class AIEngine {
 
   /// 上次请求时间戳，用于强制最小间隔
   DateTime _lastRequestTime = DateTime(2000);
+
+  /// 当前请求的取消令牌 — 新请求到来时取消旧请求
+  CancelToken? _currentCancelToken;
 
   /// 各 provider 的最小请求间隔（防 429）
   static const _minIntervals = {
@@ -68,6 +71,11 @@ class AIEngine {
       throw StateError(error);
     }
 
+    // 取消上一个未完成的请求（释放并发配额，防止 429）
+    _currentCancelToken?.cancel();
+    final cancelToken = CancelToken();
+    _currentCancelToken = cancelToken;
+
     // 请求节流：确保最小间隔
     final sinceLast = DateTime.now().difference(_lastRequestTime);
     if (sinceLast < _minInterval) {
@@ -90,11 +98,14 @@ class AIEngine {
         };
 
         if (body['stream'] as bool) {
-          return await _sendStreamingRequest(body, onChunk!, onComplete, onError);
+          return await _sendStreamingRequest(body, onChunk!, onComplete, onError, cancelToken);
         } else {
-          return await _sendNormalRequest(body);
+          return await _sendNormalRequest(body, cancelToken);
         }
       } on DioException catch (e) {
+        if (e.type == DioExceptionType.cancel) {
+          rethrow;
+        }
         final statusCode = e.response?.statusCode;
         if ((statusCode == 429 || statusCode == 503) && attempt < AppConstants.maxRetries) {
           attempt++;
@@ -107,6 +118,9 @@ class AIEngine {
         onError?.call(errorMsg);
         throw Exception(errorMsg);
       } catch (e) {
+        if (e is DioException && e.type == DioExceptionType.cancel) {
+          rethrow;
+        }
         if (attempt < AppConstants.maxRetries) {
           attempt++;
           await Future.delayed(Duration(seconds: (1 << attempt).clamp(1, 8)));
@@ -125,6 +139,7 @@ class AIEngine {
     OnStreamChunk onChunk,
     OnStreamComplete? onComplete,
     OnStreamError? onError,
+    CancelToken cancelToken,
   ) async {
     final fullContent = StringBuffer();
 
@@ -133,6 +148,7 @@ class AIEngine {
         '/chat/completions',
         data: body,
         options: Options(responseType: ResponseType.stream),
+        cancelToken: cancelToken,
       );
 
       await for (final line in response.data!.stream
@@ -164,6 +180,9 @@ class AIEngine {
       onComplete?.call(result);
       return result;
     } catch (e) {
+      if (e is DioException && e.type == DioExceptionType.cancel) {
+        rethrow;
+      }
       final errorMsg = '流式请求失败: $e';
       onError?.call(errorMsg);
       rethrow;
@@ -171,10 +190,11 @@ class AIEngine {
   }
 
   /// 普通（非流式）请求
-  Future<String> _sendNormalRequest(Map<String, dynamic> body) async {
+  Future<String> _sendNormalRequest(Map<String, dynamic> body, CancelToken cancelToken) async {
     final response = await _dio!.post<Map<String, dynamic>>(
       '/chat/completions',
       data: body,
+      cancelToken: cancelToken,
     );
 
     final data = response.data;

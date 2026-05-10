@@ -178,7 +178,7 @@ class SettingsPage extends ConsumerWidget {
             const ListTile(
               leading: Icon(Icons.info_outline, color: AppTheme.textSecondary),
               title: Text('光速读书'),
-              subtitle: Text('版本 0.0.2 · 纯本地离线运行'),
+              subtitle: Text('版本 0.0.3 · 纯本地离线运行'),
             ),
           ],
         ),
