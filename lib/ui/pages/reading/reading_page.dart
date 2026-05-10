@@ -87,10 +87,10 @@ class _ReadingPageState extends ConsumerState<ReadingPage> {
       if (_book != null) {
         final contentChapters = _contentChapters;
         final contentIndex = _getContentChapterIndex(chapter);
-        if (contentChapters.isNotEmpty && contentIndex >= 0) {
-          final progress = (contentIndex + 1) / contentChapters.length;
-          _bookRepo.updateProgress(widget.bookId, contentIndex, progress);
-        }
+        final progress = (contentChapters.isNotEmpty && contentIndex >= 0)
+            ? (contentIndex + 1) / contentChapters.length
+            : 0.0;
+        _bookRepo.updateProgress(widget.bookId, chapter.index, progress);
       }
       _ensureConversation(chapter.id);
       if (isChapterSwitch && _currentConversationId != null) {
