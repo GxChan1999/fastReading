@@ -9,7 +9,7 @@ typedef OnStreamChunk = void Function(String chunk);
 typedef OnStreamComplete = void Function(String fullContent);
 typedef OnStreamError = void Function(String error);
 
-/// AI 引擎 — 直连大模型 API，支持流式响应
+/// AI 引擎 — 直连大模型 API，支持流式响应、自动重试、请求节流
 class AIEngine {
   static final AIEngine _instance = AIEngine._();
   factory AIEngine() => _instance;
@@ -19,6 +19,18 @@ class AIEngine {
   Dio? _dio;
   ApiConfig _config = const ApiConfig();
   bool _initialized = false;
+
+  /// 上次请求时间戳，用于强制最小间隔
+  DateTime _lastRequestTime = DateTime(2000);
+
+  /// 各 provider 的最小请求间隔（防 429）
+  static const _minIntervals = {
+    'zhipu': Duration(seconds: 3),
+    'doubao': Duration(seconds: 2),
+  };
+
+  Duration get _minInterval =>
+      _minIntervals[_config.provider] ?? const Duration(milliseconds: 600);
 
   /// 使用 API 配置初始化
   void initialize(ApiConfig config) {
@@ -43,9 +55,7 @@ class AIEngine {
   /// 获取当前配置
   ApiConfig get config => _config;
 
-  /// 发送流式聊天请求
-  /// [messages] 消息列表，格式: [{"role": "system/user/assistant", "content": "..."}]
-  /// 返回完整响应文本
+  /// 发送聊天请求（支持流式，自动重试 + 请求节流）
   Future<String> sendChat({
     required List<Map<String, String>> messages,
     OnStreamChunk? onChunk,
@@ -58,30 +68,54 @@ class AIEngine {
       throw StateError(error);
     }
 
-    try {
-      final body = {
-        'model': _config.model,
-        'messages': messages,
-        'temperature': _config.temperature,
-        'max_tokens': _config.maxTokens,
-        'stream': onChunk != null, // 有回调才启用流式
-        if (_config.provider == 'zhipu' && _config.thinkingEnabled)
-          'thinking': {'type': 'enabled'},
-      };
+    // 请求节流：确保最小间隔
+    final sinceLast = DateTime.now().difference(_lastRequestTime);
+    if (sinceLast < _minInterval) {
+      await Future.delayed(_minInterval - sinceLast);
+    }
 
-      if (body['stream'] as bool) {
-        return await _sendStreamingRequest(body, onChunk!, onComplete, onError);
-      } else {
-        return await _sendNormalRequest(body);
+    // 带指数退避的重试循环
+    var attempt = 0;
+    while (true) {
+      try {
+        _lastRequestTime = DateTime.now();
+        final body = {
+          'model': _config.model,
+          'messages': messages,
+          'temperature': _config.temperature,
+          'max_tokens': _config.maxTokens,
+          'stream': onChunk != null,
+          if (_config.provider == 'zhipu' && _config.thinkingEnabled)
+            'thinking': {'type': 'enabled'},
+        };
+
+        if (body['stream'] as bool) {
+          return await _sendStreamingRequest(body, onChunk!, onComplete, onError);
+        } else {
+          return await _sendNormalRequest(body);
+        }
+      } on DioException catch (e) {
+        final statusCode = e.response?.statusCode;
+        if ((statusCode == 429 || statusCode == 503) && attempt < AppConstants.maxRetries) {
+          attempt++;
+          final delay = Duration(seconds: (1 << attempt).clamp(1, 16));
+          onError?.call('请求频繁，${delay.inSeconds}秒后重试（$attempt/${AppConstants.maxRetries}）...');
+          await Future.delayed(delay);
+          continue;
+        }
+        final errorMsg = _handleDioError(e);
+        onError?.call(errorMsg);
+        throw Exception(errorMsg);
+      } catch (e) {
+        if (attempt < AppConstants.maxRetries) {
+          attempt++;
+          await Future.delayed(Duration(seconds: (1 << attempt).clamp(1, 8)));
+          continue;
+        }
+        final errorMsg = '请求失败: $e';
+        onError?.call(errorMsg);
+        throw Exception(errorMsg);
       }
-    } on DioException catch (e) {
-      final errorMsg = _handleDioError(e);
-      onError?.call(errorMsg);
-      throw Exception(errorMsg);
-    } catch (e) {
-      final errorMsg = '请求失败: $e';
-      onError?.call(errorMsg);
-      throw Exception(errorMsg);
     }
   }
 
