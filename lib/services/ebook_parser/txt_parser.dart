@@ -29,25 +29,36 @@ class TxtParserImpl implements EbookParser {
     );
   }
 
-  /// 智能章节拆分
+  /// 智能章节拆分 + 三层分类
   List<EbookChapter> _splitChapters(String content) {
-    final chapters = <EbookChapter>[];
     final matches = _chapterPattern.allMatches(content).toList();
 
     if (matches.isEmpty) {
-      // 无法识别章节，整本作为一个章节
       return [EbookChapter(title: '全文', content: content, chapterType: ChapterType.body)];
     }
 
+    // 先提取所有章节的标题和内容
+    final titles = <String>[];
+    final contents = <String>[];
     for (int i = 0; i < matches.length; i++) {
       final start = matches[i].start;
       final end = (i + 1 < matches.length) ? matches[i + 1].start : content.length;
-      final title = matches[i].group(0)?.trim() ?? '第${i + 1}章';
-      final chapterContent = content.substring(start, end).trim();
+      titles.add(matches[i].group(0)?.trim() ?? '第${i + 1}章');
+      contents.add(content.substring(start, end).trim());
+    }
+
+    // 用统计信息做批量分类
+    final types = ChapterFilter.classifyAll(
+      titles: titles,
+      contents: contents,
+    );
+
+    final chapters = <EbookChapter>[];
+    for (var i = 0; i < matches.length; i++) {
       chapters.add(EbookChapter(
-        title: title,
-        content: chapterContent,
-        chapterType: ChapterFilter.getChapterType(title, content: chapterContent),
+        title: titles[i],
+        content: contents[i],
+        chapterType: types[i],
       ));
     }
 
