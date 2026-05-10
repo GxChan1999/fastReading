@@ -31,6 +31,7 @@ class _BookContentViewState extends State<BookContentView> {
   double? _lastHeight;
   PageController? _internalController;
   bool _isHovering = false;
+  bool _isPaginating = false;
 
   PageController get _controller =>
       widget.pageController ?? (_internalController ??= PageController());
@@ -51,6 +52,25 @@ class _BookContentViewState extends State<BookContentView> {
   void dispose() {
     _internalController?.dispose();
     super.dispose();
+  }
+
+  void _schedulePaginate(double width, double height, String text) {
+    if (_isPaginating) return;
+    _isPaginating = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        _isPaginating = false;
+        return;
+      }
+      _paginate(width, height, text);
+      _isPaginating = false;
+      if (mounted) {
+        setState(() {});
+        if (_controller.hasClients && _pages.isNotEmpty) {
+          _controller.jumpToPage(0);
+        }
+      }
+    });
   }
 
   void _paginate(double width, double height, String text) {
@@ -185,12 +205,7 @@ class _BookContentViewState extends State<BookContentView> {
         if (_pages.isEmpty || _lastWidth != w || _lastHeight != h) {
           _lastWidth = w;
           _lastHeight = h;
-          _paginate(w, h, widget.content);
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (_controller.hasClients) {
-              _controller.jumpToPage(0);
-            }
-          });
+          _schedulePaginate(w, h, widget.content);
         }
 
         if (_pages.isEmpty) {
@@ -221,28 +236,32 @@ class _BookContentViewState extends State<BookContentView> {
               children: [
                 Container(
                   color: widget.prefs.backgroundColor,
-                  child: PageView.builder(
-                    controller: _controller,
-                    itemCount: _pages.length,
-                    onPageChanged: (page) {
-                      setState(() => _currentPage = page);
-                      widget.onPageChanged?.call(page);
-                    },
-                    itemBuilder: (context, index) {
-                      return Container(
-                        padding: EdgeInsets.all(w > 600 ? 32 : 16),
-                        child: SelectableText(
-                          _pages[index],
-                          style: TextStyle(
-                            fontSize: widget.prefs.fontSize,
-                            height: widget.prefs.lineHeight,
-                            color: widget.prefs.textColor,
-                            fontFamily:
-                                widget.prefs.useSystemFont ? null : 'serif',
-                          ),
-                        ),
-                      );
-                    },
+                  child: SelectionArea(
+                    child: RepaintBoundary(
+                      child: PageView.builder(
+                        controller: _controller,
+                        itemCount: _pages.length,
+                        onPageChanged: (page) {
+                          setState(() => _currentPage = page);
+                          widget.onPageChanged?.call(page);
+                        },
+                        itemBuilder: (context, index) {
+                          return Container(
+                            padding: EdgeInsets.all(w > 600 ? 32 : 16),
+                            child: Text(
+                              _pages[index],
+                              style: TextStyle(
+                                fontSize: widget.prefs.fontSize,
+                                height: widget.prefs.lineHeight,
+                                color: widget.prefs.textColor,
+                                fontFamily:
+                                    widget.prefs.useSystemFont ? null : 'serif',
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   ),
                 ),
                 // 鼠标悬停时的翻页箭头

@@ -84,9 +84,9 @@ class AIRequestBuilder {
       messages.add({'role': 'system', 'content': '当前书籍：$_bookInfo'});
     }
 
-    // 4. 阅读内容
+    // 4. 阅读内容（含结构化的章节元数据和正文）
     if (_readingContent != null && _readingContent!.isNotEmpty) {
-      messages.add({'role': 'system', 'content': '当前阅读内容：\n$_readingContent'});
+      messages.add({'role': 'system', 'content': _readingContent!});
     }
 
     // 5. 费曼归档上下文

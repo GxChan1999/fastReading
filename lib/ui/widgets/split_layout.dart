@@ -20,7 +20,7 @@ class SplitLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (PlatformUtils.isDesktop) {
+    if (PlatformUtils.isWideScreen(context)) {
       return _buildHorizontalSplit(context);
     }
     return _buildVerticalSplit(context);

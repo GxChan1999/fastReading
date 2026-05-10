@@ -84,17 +84,40 @@ class _ApiKeySettingsState extends State<ApiKeySettings> {
               ),
               items: const [
                 DropdownMenuItem(value: 'openai', child: Text('OpenAI')),
+                DropdownMenuItem(value: 'deepseek', child: Text('DeepSeek')),
                 DropdownMenuItem(value: 'doubao', child: Text('豆包')),
                 DropdownMenuItem(value: 'claude', child: Text('Claude')),
                 DropdownMenuItem(value: 'zhipu', child: Text('智谱 GLM')),
+                DropdownMenuItem(value: 'custom', child: Text('自定义')),
               ],
               onChanged: (value) {
                 if (value != null) {
                   setState(() {
                     _provider = value;
-                    if (value == 'zhipu') {
-                      _baseUrlController.text = 'https://open.bigmodel.cn/api/paas/v4';
-                      _modelController.text = 'glm-4.7-flash';
+                    switch (value) {
+                      case 'deepseek':
+                        _baseUrlController.text = 'https://api.deepseek.com/v1';
+                        _modelController.text = 'deepseek-chat';
+                        break;
+                      case 'zhipu':
+                        _baseUrlController.text = 'https://open.bigmodel.cn/api/paas/v4';
+                        _modelController.text = 'glm-4.7-flash';
+                        break;
+                      case 'openai':
+                        _baseUrlController.text = 'https://api.openai.com/v1';
+                        _modelController.text = 'gpt-4o';
+                        break;
+                      case 'doubao':
+                        _baseUrlController.text = 'https://ark.cn-beijing.volces.com/api/v3';
+                        _modelController.text = 'doubao-1.5-pro-32k';
+                        break;
+                      case 'claude':
+                        _baseUrlController.text = 'https://api.anthropic.com/v1';
+                        _modelController.text = 'claude-sonnet-4-20250514';
+                        break;
+                      case 'custom':
+                        // 保留用户自定义值
+                        break;
                     }
                   });
                 }

@@ -25,10 +25,12 @@ class EpubParserImpl implements EbookParser {
       final htmlContent = await chapterRef.readHtmlContent();
       final document = html_parser.parse(htmlContent);
       final text = (document.body?.text ?? '').trim();
+      final title = chapterRef.title ?? '';
 
       chapters.add(EbookChapter(
-        title: chapterRef.title ?? '',
+        title: title,
         content: text,
+        chapterType: ChapterFilter.getChapterType(title, content: text),
       ));
     }
 

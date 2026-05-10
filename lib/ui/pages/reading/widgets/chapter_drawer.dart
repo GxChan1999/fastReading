@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../data/models/book_chapter.dart';
+import '../../../../services/ebook_parser/ebook_parser.dart';
 
 /// 目录抽屉 — 自定义动画侧面板
 class ChapterDrawer extends StatefulWidget {
@@ -131,8 +132,6 @@ class _ChapterDrawerState extends State<ChapterDrawer>
                       widget.onChapterTap(chapter);
                       close();
                     },
-                    slideAnim: _slideAnim,
-                    animationDuration: _controller.duration!,
                   ),
                 ),
               ],
@@ -145,117 +144,64 @@ class _ChapterDrawerState extends State<ChapterDrawer>
   }
 }
 
-/// 章节列表 — 交错入场动画
-class _ChapterList extends StatefulWidget {
+/// 章节列表 — 无交错动画，使用固定高度优化滚动性能
+class _ChapterList extends StatelessWidget {
   final List<BookChapter> chapters;
   final String? currentChapterId;
   final ValueChanged<BookChapter> onChapterTap;
-  final Animation<double> slideAnim;
-  final Duration animationDuration;
 
   const _ChapterList({
     required this.chapters,
     this.currentChapterId,
     required this.onChapterTap,
-    required this.slideAnim,
-    required this.animationDuration,
+    super.key,
   });
 
   @override
-  State<_ChapterList> createState() => _ChapterListState();
-}
-
-class _ChapterListState extends State<_ChapterList> {
-  final List<_ItemEntry> _entries = [];
-  bool _built = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_built && widget.chapters.isNotEmpty) {
-      _built = true;
-      _buildEntries();
-    }
-  }
-
-  void _buildEntries() {
-    for (var i = 0; i < widget.chapters.length; i++) {
-      final delay = (i * 30).clamp(0, 400);
-      final anim = CurvedAnimation(
-        parent: widget.slideAnim,
-        curve: Interval(
-          (delay / widget.animationDuration.inMilliseconds).clamp(0.0, 0.8),
-          1.0,
-          curve: Curves.easeOutCubic,
-        ),
-      );
-      _entries.add(_ItemEntry(
-        chapter: widget.chapters[i],
-        opacityAnim: anim,
-      ));
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return ListView.separated(
+    return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: _entries.length,
-      separatorBuilder: (_, __) =>
-          const Divider(height: 1, indent: 20, endIndent: 20),
+      itemCount: chapters.length,
+      itemExtent: 48, // 固定高度，启用滚动优化
       itemBuilder: (context, index) {
-        final entry = _entries[index];
-        final chapter = entry.chapter;
-        final isCurrent = chapter.id == widget.currentChapterId;
-        final isRead = chapter.isRead;
+        final chapter = chapters[index];
+        final isCurrent = chapter.id == currentChapterId;
+        final isContentChapter = ChapterFilter.isContentChapter(chapter.title);
 
-        return AnimatedBuilder(
-          animation: entry.opacityAnim,
-          builder: (context, child) {
-            return Opacity(
-              opacity: entry.opacityAnim.value,
-              child: Transform.translate(
-                offset: Offset(12 * (1 - entry.opacityAnim.value), 0),
-                child: child,
-              ),
-            );
-          },
-          child: ListTile(
-            dense: true,
-            selected: isCurrent,
-            selectedTileColor: AppTheme.primaryColor.withOpacity(0.1),
-            leading: SizedBox(
-              width: 24,
-              child: isRead
-                  ? const Icon(Icons.check_circle, size: 16,
-                      color: AppTheme.successColor)
-                  : Text(
-                      '${index + 1}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.textSecondary,
-                      ),
+        return ListTile(
+          dense: true,
+          selected: isCurrent,
+          selectedTileColor: AppTheme.primaryColor.withOpacity(0.1),
+          leading: SizedBox(
+            width: 24,
+            child: chapter.isRead
+                ? const Icon(Icons.check_circle, size: 16,
+                    color: AppTheme.successColor)
+                : Text(
+                    '${index + 1}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
                     ),
-            ),
-            title: Text(
-              chapter.title,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: isCurrent ? FontWeight.w600 : FontWeight.normal,
-                color:
-                    isCurrent ? AppTheme.primaryColor : AppTheme.textPrimary,
-              ),
-            ),
-            onTap: () => widget.onChapterTap(chapter),
+                  ),
           ),
+          title: Text(
+            chapter.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: isCurrent ? FontWeight.w600 : FontWeight.normal,
+              color: isCurrent
+                  ? AppTheme.primaryColor
+                  : isContentChapter
+                      ? AppTheme.textPrimary
+                      : AppTheme.textSecondary,
+            ),
+          ),
+          onTap: () => onChapterTap(chapter),
         );
       },
     );
   }
-}
-
-class _ItemEntry {
-  final BookChapter chapter;
-  final Animation<double> opacityAnim;
-  _ItemEntry({required this.chapter, required this.opacityAnim});
 }

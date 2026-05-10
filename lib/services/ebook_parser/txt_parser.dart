@@ -36,7 +36,7 @@ class TxtParserImpl implements EbookParser {
 
     if (matches.isEmpty) {
       // 无法识别章节，整本作为一个章节
-      return [EbookChapter(title: '全文', content: content)];
+      return [EbookChapter(title: '全文', content: content, chapterType: ChapterType.body)];
     }
 
     for (int i = 0; i < matches.length; i++) {
@@ -44,7 +44,11 @@ class TxtParserImpl implements EbookParser {
       final end = (i + 1 < matches.length) ? matches[i + 1].start : content.length;
       final title = matches[i].group(0)?.trim() ?? '第${i + 1}章';
       final chapterContent = content.substring(start, end).trim();
-      chapters.add(EbookChapter(title: title, content: chapterContent));
+      chapters.add(EbookChapter(
+        title: title,
+        content: chapterContent,
+        chapterType: ChapterFilter.getChapterType(title, content: chapterContent),
+      ));
     }
 
     return chapters;

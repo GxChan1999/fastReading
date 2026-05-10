@@ -488,6 +488,23 @@ class DatabaseHelper {
     ''', [DateTime.now().toIso8601String(), message.conversationId]);
   }
 
+  /// 插入消息（不更新对话计数，用于数据恢复）
+  void insertMessageRaw(conv.ConversationMessage message) {
+    _db.execute('''
+      INSERT INTO conversation_messages (id, conversation_id, role, content, is_streaming, is_starred, is_difficulty, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ''', [
+      message.id,
+      message.conversationId,
+      message.role.name,
+      message.content,
+      message.isStreaming ? 1 : 0,
+      message.isStarred ? 1 : 0,
+      message.isDifficulty ? 1 : 0,
+      message.createdAt.toIso8601String(),
+    ]);
+  }
+
   /// 更新消息内容（流式更新）
   void updateMessageContent(String messageId, String content) {
     _db.execute('UPDATE conversation_messages SET content = ? WHERE id = ?', [content, messageId]);
@@ -801,7 +818,7 @@ class DatabaseHelper {
 
   // ==================== 数据导出 ====================
 
-  /// 导出全量数据为 JSON 格式
+  /// 导出全量数据为 JSON 格式（所有表结构数据，不含文件内容）
   Map<String, dynamic> exportAllData() {
     return {
       'books': getAllBooks().map((b) => {
@@ -810,6 +827,8 @@ class DatabaseHelper {
             'author': b.author,
             'format': b.format.name,
             'filePath': b.filePath,
+            'chapterTextsDir': b.chapterTextsDir,
+            'coverPath': b.coverPath,
             'totalChapters': b.totalChapters,
             'currentChapter': b.currentChapter,
             'progress': b.progress,
@@ -817,6 +836,47 @@ class DatabaseHelper {
             'currentFlowState': b.currentFlowState,
             'createdAt': b.createdAt.toIso8601String(),
             'updatedAt': b.updatedAt.toIso8601String(),
+          }).toList(),
+      'chapters': _db.select('SELECT * FROM book_chapters ORDER BY book_id, idx').map((r) => {
+            'id': r['id'],
+            'book_id': r['book_id'],
+            'idx': r['idx'],
+            'title': r['title'],
+            'text_file_path': r['text_file_path'],
+            'page_count': r['page_count'],
+            'is_read': r['is_read'],
+            'created_at': r['created_at'],
+          }).toList(),
+      'conversations': _db.select('SELECT * FROM conversations ORDER BY book_id, created_at').map((r) => {
+            'id': r['id'],
+            'book_id': r['book_id'],
+            'chapter_id': r['chapter_id'],
+            'flow_state': r['flow_state'],
+            'title': r['title'],
+            'message_count': r['message_count'],
+            'created_at': r['created_at'],
+            'updated_at': r['updated_at'],
+          }).toList(),
+      'messages': _db.select('SELECT * FROM conversation_messages ORDER BY conversation_id, created_at').map((r) => {
+            'id': r['id'],
+            'conversation_id': r['conversation_id'],
+            'role': r['role'],
+            'content': r['content'],
+            'is_streaming': r['is_streaming'],
+            'is_starred': r['is_starred'],
+            'is_difficulty': r['is_difficulty'],
+            'created_at': r['created_at'],
+          }).toList(),
+      'difficulties': _db.select('SELECT * FROM difficulty_list ORDER BY book_id, created_at').map((r) => {
+            'id': r['id'],
+            'book_id': r['book_id'],
+            'chapter_id': r['chapter_id'],
+            'content': r['content'],
+            'selected_text': r['selected_text'],
+            'ai_explanation': r['ai_explanation'],
+            'is_resolved': r['is_resolved'],
+            'created_at': r['created_at'],
+            'updated_at': r['updated_at'],
           }).toList(),
       'configs': _db.select('SELECT * FROM app_config').map((r) => {
             'key': r['key'] as String,

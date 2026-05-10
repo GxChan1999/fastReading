@@ -1,0 +1,28 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+  <!-- Book body -->
+  <path
+      android:fillColor="#FFFFFF"
+      android:pathData="M24,38 L24,82 L54,77 L84,82 L84,38 L54,43 Z" />
+
+  <!-- Book spine / left page -->
+  <path
+      android:fillColor="#D0D0D0"
+      android:pathData="M24,38 L24,82 L30,80 L30,40 Z" />
+
+  <!-- Lightning bolt through the book -->
+  <path
+      android:fillColor="#FFD700"
+      android:pathData="M50,22 L44,50 L54,48 L46,86 L64,52 L54,54 Z" />
+
+  <!-- Lightning glow -->
+  <path
+      android:fillColor="#FFF59D"
+      android:fillAlpha="0.4"
+      android:pathData="M48,24 L43,48 L52,46 L44,84 L60,54 L51,56 Z" />
+
+</vector>

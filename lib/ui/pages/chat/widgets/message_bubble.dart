@@ -9,6 +9,31 @@ class MessageBubble extends StatelessWidget {
 
   const MessageBubble({super.key, required this.message});
 
+  static final MarkdownStyleSheet _mdStyleSheet = MarkdownStyleSheet(
+    p: const TextStyle(fontSize: 15, color: AppTheme.textPrimary, height: 1.6),
+    h1: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.primaryColor, height: 1.4),
+    h2: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600, color: AppTheme.primaryLight, height: 1.4),
+    h3: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppTheme.textPrimary, height: 1.4),
+    strong: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryLight),
+    code: TextStyle(fontSize: 13, fontFamily: 'monospace', backgroundColor: AppTheme.backgroundColor, color: AppTheme.primaryLight),
+    codeblockDecoration: BoxDecoration(
+      color: AppTheme.backgroundColor,
+      borderRadius: BorderRadius.circular(6),
+      border: Border.all(color: AppTheme.dividerColor),
+    ),
+    blockquoteDecoration: const BoxDecoration(
+      border: Border(left: BorderSide(color: AppTheme.primaryColor, width: 2)),
+    ),
+    blockquotePadding: const EdgeInsets.only(left: 12, top: 4, bottom: 4),
+    listBullet: const TextStyle(color: AppTheme.primaryColor),
+    horizontalRuleDecoration: const BoxDecoration(
+      border: Border(top: BorderSide(color: AppTheme.dividerColor, width: 0.5)),
+    ),
+    tableBorder: TableBorder.all(color: AppTheme.dividerColor, width: 0.5),
+    tableHead: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
+    tableBody: const TextStyle(color: AppTheme.textPrimary),
+  );
+
   @override
   Widget build(BuildContext context) {
     // 系统消息渲染为居中轻量标签
@@ -92,65 +117,7 @@ class MessageBubble extends StatelessWidget {
         MarkdownBody(
           data: message.content + (isStreaming ? '▋' : ''),
           selectable: true,
-          styleSheet: MarkdownStyleSheet(
-            p: const TextStyle(
-              fontSize: 15,
-              color: AppTheme.textPrimary,
-              height: 1.6,
-            ),
-            h1: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.primaryColor,
-              height: 1.4,
-            ),
-            h2: const TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.primaryLight,
-              height: 1.4,
-            ),
-            h3: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textPrimary,
-              height: 1.4,
-            ),
-            strong: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: AppTheme.primaryLight,
-            ),
-            code: TextStyle(
-              fontSize: 13,
-              fontFamily: 'monospace',
-              backgroundColor: AppTheme.backgroundColor,
-              color: AppTheme.primaryLight,
-            ),
-            codeblockDecoration: BoxDecoration(
-              color: AppTheme.backgroundColor,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: AppTheme.dividerColor),
-            ),
-            blockquoteDecoration: BoxDecoration(
-              border: const Border(
-                left: BorderSide(color: AppTheme.primaryColor, width: 2),
-              ),
-              color: AppTheme.backgroundColor.withOpacity(0.5),
-            ),
-            blockquotePadding: const EdgeInsets.only(left: 12, top: 4, bottom: 4),
-            listBullet: const TextStyle(color: AppTheme.primaryColor),
-            horizontalRuleDecoration: const BoxDecoration(
-              border: Border(
-                top: BorderSide(color: AppTheme.dividerColor, width: 0.5),
-              ),
-            ),
-            tableBorder: TableBorder.all(color: AppTheme.dividerColor, width: 0.5),
-            tableHead: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: AppTheme.primaryColor,
-            ),
-            tableBody: const TextStyle(color: AppTheme.textPrimary),
-          ),
+          styleSheet: _mdStyleSheet,
         ),
         if (message.isStarred || message.isDifficulty)
           Padding(

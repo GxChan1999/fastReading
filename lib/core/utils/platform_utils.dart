@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 /// 平台工具类
 class PlatformUtils {
@@ -15,6 +16,14 @@ class PlatformUtils {
   static bool get isMobile {
     if (kIsWeb) return false;
     return Platform.isAndroid || Platform.isIOS;
+  }
+
+  /// 是否为宽屏：平板、折叠屏展开、PC 端
+  /// 阈值 600dp 是 Material Design 标准断点
+  static bool isWideScreen(BuildContext context) {
+    if (isDesktop) return true;
+    final width = MediaQuery.of(context).size.width;
+    return width >= 600;
   }
 
   /// 是否为 Windows

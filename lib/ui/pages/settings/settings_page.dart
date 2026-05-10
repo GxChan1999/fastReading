@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/app_config.dart';
 import '../../../providers/settings_provider.dart';
@@ -73,17 +74,22 @@ class SettingsPage extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              '数据管理',
+              '数据管理 · 迁移',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              '备份后可迁移到新版本或另一台设备',
+              style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
             ),
             const SizedBox(height: 12),
             ListTile(
               leading: const Icon(Icons.backup, color: AppTheme.primaryColor),
-              title: const Text('备份全量数据'),
-              subtitle: const Text('导出数据库和配置文件'),
+              title: const Text('完整备份（含归档）'),
+              subtitle: const Text('导出 JSON 备份文件，含书籍、对话、费曼归档'),
               onTap: () async {
                 try {
-                  final path = await ExportService.instance.backupAllData();
+                  final path = await ExportService.instance.backupFullData();
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('备份成功: $path')),
@@ -103,11 +109,49 @@ class SettingsPage extends ConsumerWidget {
             ),
             const Divider(height: 1),
             ListTile(
+              leading: const Icon(Icons.restore, color: AppTheme.successColor),
+              title: const Text('从备份恢复'),
+              subtitle: const Text('选择 JSON 备份文件，恢复所有数据'),
+              onTap: () async {
+                try {
+                  final result = await FilePicker.platform.pickFiles(
+                    type: FileType.custom,
+                    allowedExtensions: ['json'],
+                  );
+                  if (result == null || result.files.isEmpty) return;
+
+                  final stats = await ExportService.instance
+                      .restoreFromBackup(result.files.single.path!);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          '恢复完成：${stats['books']}本书、${stats['chapters']}章、'
+                          '${stats['conversations']}轮对话、${stats['messages']}条消息、'
+                          '${stats['sessions']}条归档、${stats['difficulties']}条疑难、'
+                          '${stats['configs']}项配置',
+                        ),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('恢复失败: $e'),
+                        backgroundColor: AppTheme.errorColor,
+                      ),
+                    );
+                  }
+                }
+              },
+            ),
+            const Divider(height: 1),
+            ListTile(
               leading: const Icon(Icons.file_download, color: AppTheme.primaryColor),
               title: const Text('导出阅读笔记'),
               subtitle: const Text('生成 MD 格式笔记文件'),
               onTap: () {
-                // TODO: 选择书籍后导出
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('请在书籍页面中使用导出功能')),
                 );

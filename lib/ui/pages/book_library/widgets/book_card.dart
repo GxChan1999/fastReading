@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/utils/platform_utils.dart';
 import '../../../../data/models/book.dart';
 
 /// 书籍卡片组件
@@ -29,84 +28,87 @@ class _BookCardState extends State<BookCard> {
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          children: [
-            InkWell(
-              onTap: widget.onTap,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: _buildCoverArea()),
-                    const SizedBox(height: 12),
-                    Text(
-                      widget.book.name,
-                      style: Theme.of(context).textTheme.titleMedium,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    if (widget.book.author.isNotEmpty)
+      child: GestureDetector(
+        onLongPress: widget.onDelete,
+        child: Card(
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            children: [
+              InkWell(
+                onTap: widget.onTap,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: _buildCoverArea()),
+                      const SizedBox(height: 12),
                       Text(
-                        widget.book.author,
-                        style: Theme.of(context).textTheme.bodySmall,
-                        maxLines: 1,
+                        widget.book.name,
+                        style: Theme.of(context).textTheme.titleMedium,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        _buildFormatChip(context),
-                        const Spacer(),
-                        _buildProgressText(),
-                      ],
-                    ),
-                    if (widget.book.progress > 0) ...[
-                      const SizedBox(height: 8),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(2),
-                        child: LinearProgressIndicator(
-                          value: widget.book.progress,
-                          backgroundColor: AppTheme.dividerColor,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            widget.book.status == ReadingStatus.finished
-                                ? AppTheme.successColor
-                                : AppTheme.primaryColor,
-                          ),
-                          minHeight: 3,
+                      const SizedBox(height: 4),
+                      if (widget.book.author.isNotEmpty)
+                        Text(
+                          widget.book.author,
+                          style: Theme.of(context).textTheme.bodySmall,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          _buildFormatChip(context),
+                          const Spacer(),
+                          _buildProgressText(),
+                        ],
                       ),
+                      if (widget.book.progress > 0) ...[
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(2),
+                          child: LinearProgressIndicator(
+                            value: widget.book.progress,
+                            backgroundColor: AppTheme.dividerColor,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              widget.book.status == ReadingStatus.finished
+                                  ? AppTheme.successColor
+                                  : AppTheme.primaryColor,
+                            ),
+                            minHeight: 3,
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
-                ),
-              ),
-            ),
-            if (widget.onDelete != null)
-              Positioned(
-                top: 4,
-                right: 4,
-                child: AnimatedOpacity(
-                  opacity: _isHovered ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 150),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: IconButton(
-                      icon: const Icon(Icons.close, size: 16),
-                      padding: const EdgeInsets.all(4),
-                      constraints: const BoxConstraints(),
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.black54,
-                        foregroundColor: Colors.white,
-                      ),
-                      onPressed: _isHovered ? widget.onDelete : null,
-                    ),
                   ),
                 ),
               ),
-          ],
+              if (widget.onDelete != null)
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: AnimatedOpacity(
+                    opacity: _isHovered ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 150),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: IconButton(
+                        icon: const Icon(Icons.close, size: 16),
+                        padding: const EdgeInsets.all(4),
+                        constraints: const BoxConstraints(),
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.black54,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: widget.onDelete,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

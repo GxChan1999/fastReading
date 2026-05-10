@@ -76,6 +76,9 @@ class EbookService {
 
     // 7. 构造书籍元数据
     final now = DateTime.now();
+    final bodyChapters = parseResult.chapters
+        .where((c) => c.chapterType == ChapterType.body)
+        .length;
     final book = Book(
       id: '', // 由 Repository 生成
       name: parseResult.title,
@@ -84,7 +87,7 @@ class EbookService {
       filePath: sourcePath,
       chapterTextsDir: chapterTextsDir,
       coverPath: coverPath,
-      totalChapters: parseResult.chapters.length,
+      totalChapters: bodyChapters, // 只统计正文章节数
       createdAt: now,
       updatedAt: now,
     );
